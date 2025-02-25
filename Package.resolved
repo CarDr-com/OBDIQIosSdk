@@ -1,0 +1,15 @@
+{
+  "originHash" : "3565c7fcdaaf2e15c14a37ab0531136e6eaa2f81f469a2eb10d5ee52e9b7be9e",
+  "pins" : [
+    {
+      "identity" : "repairclubsdk",
+      "kind" : "remoteSourceControl",
+      "location" : "git@github.com:RRCummins/RepairClubSDK.git",
+      "state" : {
+        "revision" : "ebba41696c06314f21d88c9be747f572beb4d8a1",
+        "version" : "1.3.2-beta.1"
+      }
+    }
+  ],
+  "version" : 3
+}
