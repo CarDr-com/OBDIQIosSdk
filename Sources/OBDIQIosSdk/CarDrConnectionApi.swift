@@ -13,6 +13,7 @@ import CoreBluetooth
 @available(iOS 13.0.0, *)
 public class CarDrConnectionApi {
     
+    public init() { } 
    
     var dtcErrorCodeArray = [DTCResponseModel]()
     private let rc = RepairClubManager.shared
