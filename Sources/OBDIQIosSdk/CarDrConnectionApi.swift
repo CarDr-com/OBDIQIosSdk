@@ -96,14 +96,19 @@ public class CarDrConnectionApi {
     }
 
     //MARK  Call this function to disconnect the Mobile device with OBD adapter
-    func dissconnectOBD(){
+    public  func dissconnectOBD(){
         self.rc.stopTroubleCodeScan()
         self.rc.disconnectFromDevice()
+        self.dtcErrorCodeArray.removeAll()
+        self.scanID = ""
+        self.isMilOn = false
+        self.emissionList.removeAll()
+        self.clearCodesReset()
         
     }
     
     
-    func scanForDevice() {
+    public  func scanForDevice() {
             rc.returnDevices { result in
                 switch result {
                 case .success(let devices):
@@ -264,32 +269,7 @@ public class CarDrConnectionApi {
     
     
     //MARK  Call this function  to get the Vehical Detail
-    func getVehical(vin:String){
-        self.rc.requestVinDetailDecode(for: vin) { result in
-            switch result {
-            case .success:
-                do {
-                    // Attempt to get the result and filter out entries where the value is empty
-                     let vinDetailResult = try result.get().toMap().filter { !$0.value.isEmpty }
-                    
-                    // Sort the filtered dictionary alphabetically by keys
-                    let sortedVinDetailResult = vinDetailResult.sorted { $0.key < $1.key }
-                    
-                    // Use sortedVinDetailMap as needed
-                } catch {
-                    print("Error: \(error)")
-                }
-              
-
-            case .failure:break
-                
-
-            default:
-                print("Unexpected result")
-            }
-
-        }
-    }
+    
     
     
     
@@ -611,7 +591,7 @@ public class CarDrConnectionApi {
             rc.requestMonitors()
         }
     
-    func checkPassFailEmission() -> String {
+    public func checkPassFailEmission() -> String {
         let nonComplete = emissionList.filter { !$0.complete }
         
         if emissionList.isEmpty || emissionList.count <= 5 {
@@ -647,7 +627,7 @@ public class CarDrConnectionApi {
             timeSinceTroubleCodesCleared { callbackTimeSinceCodeCleared($0) }
         }
     
-    public func warmUpCyclesSinceCodesCleared(callback: @escaping (String) -> Void) {
+     func warmUpCyclesSinceCodesCleared(callback: @escaping (String) -> Void) {
         rc.requestDataPoint(pid: "0130") { result in
                
                 let scientificNotation = self.getScientificNotation(inputString: result)
@@ -658,7 +638,7 @@ public class CarDrConnectionApi {
             }
         }
 
-        public func distanceSinceCodesCleared(callback: @escaping (String) -> Void) {
+         func distanceSinceCodesCleared(callback: @escaping (String) -> Void) {
             rc.requestDataPoint(pid: "0131") { result in
                
                 let notation = self.getScientificNotation(inputString: result)
@@ -670,7 +650,7 @@ public class CarDrConnectionApi {
             }
         }
 
-        public func timeSinceTroubleCodesCleared(callback: @escaping (String) -> Void) {
+         func timeSinceTroubleCodesCleared(callback: @escaping (String) -> Void) {
             rc.requestDataPoint(pid: "014E") { result in
                
                 let notation = self.getScientificNotation(inputString: result)
@@ -691,7 +671,7 @@ public class CarDrConnectionApi {
             timeSinceTroubleCodesClearedStr = "-"
         }
 
-    public func timeRunWithMILOn(callback: @escaping (String) -> Void) {
+     func timeRunWithMILOn(callback: @escaping (String) -> Void) {
         rc.requestDataPoint(pid: "014D") { result in
                
 
@@ -726,12 +706,12 @@ public class CarDrConnectionApi {
     
         
     
-    func stopAdvanceScan(){
+    public func stopAdvanceScan(){
         self.rc.stopTroubleCodeScan()
     }
     
     
-    func getRepairCostSummary(vinNumber: String, dtcErrorCodeArray: [DTCResponseModel], callback: @escaping (Bool, [String: Any]?) -> Void) {
+    public func getRepairCostSummary(vinNumber: String, dtcErrorCodeArray: [DTCResponseModel], callback: @escaping (Bool, [String: Any]?) -> Void) {
         guard !dtcErrorCodeArray.isEmpty else {
             callback(false, nil)
             return
@@ -861,7 +841,7 @@ public class CarDrConnectionApi {
 
     //MARK  This Function to update the Firmware
     // NOTE  This function  only call after the OBD connected successfully  and any type of scan not run
-    func updateFirm(completion: @escaping (String) -> Void) {
+    public  func updateFirm(completion: @escaping (String) -> Void) {
         Timer.scheduledTimer(withTimeInterval: 10, repeats: false) { timer in
             var result = self.rc.getNewestAvailableFirmwareVersion()
              var currnt = "2.018.20"
