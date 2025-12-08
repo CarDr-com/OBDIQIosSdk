@@ -1,13 +1,13 @@
 {
-  "originHash" : "afc4f68133e17148249062c3ca51265e10100c2361d1dfe544f35557bf9eab11",
+  "originHash" : "ebfa8e41ec6bb923852eb6b21b9b9b6ca24a1fbb4c09b3daa7a1b60245eed538",
   "pins" : [
     {
-      "identity" : "repairclubsdk",
+      "identity" : "repairclub-ios-sdk",
       "kind" : "remoteSourceControl",
-      "location" : "git@github.com:RRCummins/RepairClubSDK.git",
+      "location" : "git@github.com:repairclub/repairclub-ios-sdk.git",
       "state" : {
-        "revision" : "a0554236b6f7765e5709158fcc46d1fe0ed12185",
-        "version" : "1.5.5-beta.3"
+        "revision" : "bb6d1296ea1ced874af3ff3455cac7f039f0dcf2",
+        "version" : "1.5.5-beta.8"
       }
     },
     {
