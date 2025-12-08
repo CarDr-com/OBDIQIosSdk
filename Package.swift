@@ -18,7 +18,7 @@ let package = Package(
     dependencies: [
         .package(
             url: "git@github.com:repairclub/repairclub-ios-sdk.git",
-            from: "1.3.2-beta.1"
+            from: "1.5.5-beta.8"
         ),
         .package(
             url: "https://github.com/SwiftyJSON/SwiftyJSON.git",
