@@ -3,35 +3,37 @@
 
 import PackageDescription
 
+
 let package = Package(
     name: "OBDIQIosSdk",
+    platforms: [
+        .iOS(.v12),
+        .macOS(.v11)
+    ],
     products: [
-        // Products define the executables and libraries a package produces, making them visible to other packages.
         .library(
             name: "OBDIQIosSdk",
-            targets: ["OBDIQIosSdk"]),
+            targets: ["OBDIQIosSdk"]
+        ),
     ],
     dependencies: [
         .package(
             url: "git@github.com:RRCummins/RepairClubSDK.git",
-            from: "1.5.5-beta.3"
+            from: "1.3.2-beta.1"
         ),
         .package(
-                    url: "https://github.com/SwiftyJSON/SwiftyJSON.git",
-                    from: "5.0.2"
+            url: "https://github.com/SwiftyJSON/SwiftyJSON.git",
+            from: "5.0.2"
         ),
     ],
     targets: [
-        // Targets are the basic building blocks of a package, defining a module or a test suite.
-        // Targets can depend on other targets in this package and products from dependencies.
         .target(
             name: "OBDIQIosSdk",
             dependencies: [
-                "RepairClubSDK",
-                "SwiftyJSON"
-            ]),
-        
-
+                .product(name: "RepairClubSDK", package: "RepairClubSDK"),
+                .product(name: "SwiftyJSON", package: "SwiftyJSON")
+            ]
+        )
     ]
 )
-   
+
