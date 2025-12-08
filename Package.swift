@@ -14,7 +14,11 @@ let package = Package(
     dependencies: [
         .package(
             url: "git@github.com:RRCummins/RepairClubSDK.git",
-            from: "1.3.2-beta.1"
+            from: "1.5.5-beta.3"
+        ),
+        .package(
+                    url: "https://github.com/SwiftyJSON/SwiftyJSON.git",
+                    from: "5.0.2"
         ),
     ],
     targets: [
@@ -23,9 +27,11 @@ let package = Package(
         .target(
             name: "OBDIQIosSdk",
             dependencies: [
-                "RepairClubSDK"
+                "RepairClubSDK",
+                "SwiftyJSON"
             ]),
         
 
     ]
 )
+   

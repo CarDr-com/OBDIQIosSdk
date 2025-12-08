@@ -8,6 +8,7 @@
 import Foundation
 import RepairClubSDK
 import CoreBluetooth
+import SwiftyJSON
 
 
 @available(iOS 13.0.0, *)
@@ -24,6 +25,7 @@ public class CarDrConnectionApi {
         var model = ""
         var carName = ""
         var fuelType = ""
+    var isConnected = false
     var currentFirmwareVersion = ""
     private var emissionList = [EmissionRediness]()
         private var isReadinessComplete = false
@@ -62,50 +64,143 @@ public class CarDrConnectionApi {
             userID: ""
         )
         
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(vehicleInfoNeededReceived(_:)),
-            name: .vehicleInfoNeeded,
-            object: nil
-        )
-        
-        print("Connection Successful")
     }
-    
-    @MainActor
-    @objc private func vehicleInfoNeededReceived(_ notification: Notification) {
-        guard let request = notification.object as? VehicleInfoRequest else { return }
-        
-        var message = ""
-        switch request.reason {
-        case .vinIncomplete, .vinMissing:
-            break
-        case .vehicleInfoNotFound, .serverUnavailable:
-            message = "We couldn't find the vehicle information. Please remove and reinsert the adapter in the vehicle OBD port, ensuring the device is fully inserted and the engine is running."
-        case .accessLocked:
-            message = "Access to vehicle data appears to be locked. Please start the vehicle with the key and ensure the device is firmly connected."
-        case .busMissing, .busConnectionTrouble:
-            message = "We are unable to connect. Please remove and reinsert the adapter in the vehicle OBD port, ensuring the device is fully inserted and the engine is running."
-        case .noDevicesFound:
-            message = "No Device found. Please remove and reinsert the adapter in the vehicle OBD port, ensuring the device is fully inserted and the engine is running."
-        @unknown default:
-            message = "We've encountered an unexpected issue. Please remove and reinsert the adapter in the vehicle OBD port, ensuring the device is fully inserted and the engine is running."
-        }
-        
-        print(message)
-    }
-
+  
     //MARK  Call this function to disconnect the Mobile device with OBD adapter
     public  func dissconnectOBD(){
         self.rc.stopTroubleCodeScan()
         self.rc.disconnectFromDevice()
         self.dtcErrorCodeArray.removeAll()
         self.scanID = ""
+        self.isConnected = false
         self.isMilOn = false
         self.emissionList.removeAll()
         self.clearCodesReset()
         
     }
+    
+    func loadAdvancedValueCatalog() -> [RepairClubSDK.AVECU] {
+        let catalog = rc.advancedValueOperationCatalog(set: "avr_transmission_test")
+
+       
+          return catalog
+      }
+   
+  
+    func buildKeys(from catalog: [RepairClubSDK.AVECU]) -> [(ecuKey: String, valueKey: String, valueName: String, unit: String, ecuName: String)] {
+        var keys: [(String, String, String, String, String)] = []
+
+        for ecu in catalog {
+            // ✅ Case-insensitive check for "transmission"
+            if !ecu.name.lowercased().contains("odometer") {
+                for value in ecu.values {
+                   
+                    keys.append((ecu.key, value.key, value.name, value.unit ?? "", ecu.name))
+                }
+          }
+        }
+
+        return keys
+    }
+
+
+
+ 
+//    func requestValuesOnce(from catalog: [RepairClubSDK.AVECU]) {
+//        let keys = buildKeys(from: catalog)
+//
+//        rc.advancedValueRequestOnce(keys: keys) { readings in
+//            for reading in readings {
+//                print("Reading from: \(reading.title) [\(reading.unit ?? "-")]")
+//
+//                for sample in reading.values {
+//                    let timestamp = sample.date
+//                    let valueString = sample.value.description
+//                    print(" - \(timestamp): \(valueString)")
+//                }
+//            }
+//        }
+//    }
+//
+//
+   
+
+    func
+    
+    startStreaming(from catalog: [RepairClubSDK.AVECU],
+                        onUpdate: @escaping ([StreamSample]) -> Void) {
+        let keys = buildKeys(from: catalog)
+
+        // Pre-fill samples with placeholders using value.name for title
+        var samples = keys.map { (ecuKey, valueKey, valueName,unit,ecuName) in
+            StreamSample(
+                ecuKey: ecuKey,
+                valueKey: valueKey,
+                title: valueName,
+                ecuName: ecuName,
+                unit: unit,
+                timestamp: Date(),
+                displayValue: "Waiting..."
+            )
+        }
+
+        // Flatten keys to pass into SDK
+        let flatKeys = keys.map { ($0.ecuKey, $0.valueKey) }
+
+        rc.advancedValueStartStreaming(keys: flatKeys) { readings in
+            for reading in readings {
+                let ecuKey = reading.ecuKey
+                let valueKey = reading.valueKey
+              
+
+                for sample in reading.values {
+                    let timestamp = sample.date
+                    let displayValue: String
+
+                    switch sample.value {
+                    case .number(let d):
+                        displayValue = "\(d)"
+                    case .text(let s),
+                         .enumeration(let s),
+                         .raw(let s):
+                        displayValue = s
+                    case .noData:
+                        displayValue = "N/A"
+                    case .nrc(let code):
+                        displayValue = "Unavailable (\(code))"
+                    @unknown default:
+                        displayValue = "Unknown"
+                    }
+                    
+                    if displayValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+                                    displayValue == "0" || displayValue == "0.0" {
+                                    continue
+                                }
+                    let preciseDate = Date()
+                    // Find index in samples
+                    if let index = samples.firstIndex(where: {
+                        $0.ecuKey == ecuKey && $0.valueKey == valueKey
+                    }) {
+                       
+                        let existing = samples[index]
+                        samples[index] = StreamSample(
+                            ecuKey: ecuKey,
+                            valueKey: valueKey,
+                            title: existing.title,
+                            ecuName: existing.ecuName,
+                            unit: existing.unit,
+                            timestamp: preciseDate,
+                            displayValue: displayValue
+                        )
+                    }
+                }
+            }
+
+            onUpdate(samples)
+           
+        }
+    }
+
     
     
     public  func scanForDevice() {
@@ -216,7 +311,7 @@ public class CarDrConnectionApi {
                                      let vinNumber = vin
                                  }
             case .configDownloaded:
-               
+                self.isConnected = true
                     self.connectionListner?.isReadyForScan(status: true, isGeneric: true)
                 
 
@@ -272,9 +367,13 @@ public class CarDrConnectionApi {
     
     
     
-    
+ 
+    var fail = 0
     func startAdvanceScan(advancescan:Bool = true) {
-        self.dtcErrorCodeArray.removeAll()
+       
+        
+        var strArr = [String]()
+        
         rc.startTroubleCodeScan(advancedScan: advancescan) { [self] progressupdate in
             switch progressupdate {
                 
@@ -284,29 +383,15 @@ public class CarDrConnectionApi {
                 var per = ceil(progress*100)/100
                 
                 let percent = String(format: "%.2f", per * 100)
-            
+                
+             
             case .moduleScanningUpdate(moduleName: let moduleName):
                 print("ModuleName ======= \(moduleName)")
-            case .modulesUpdate(modules: let modulesUpdate):
-                var modules = modulesUpdate.sorted(by: {
-                    // Prioritize modules with "Generic Codes" in their name
-                    if $0.name.contains("Generic Codes") { return true }
-                    if $1.name.contains("Generic Codes") { return false }
-                    let responseOrder: [ResponseStatus: Int] = [.responded:
-                                                                    1, .awaitingDecode: 2, .didNotRespond: 3, .unknown: 4]
-                    if responseOrder[$0.responseStatus]! <
-                        responseOrder[$1.responseStatus]! { return true }
-                    if responseOrder[$0.responseStatus]! >
-                        responseOrder[$1.responseStatus]! { return false }
-                    
-                    if !$0.codes.isEmpty && $1.codes.isEmpty { return true }
-                    if $0.codes.isEmpty && !$1.codes.isEmpty { return  false }
-                    
-                    return $0.name < $1.name
-                    
-                })
+            case .modulesUpdate(modules: let modulesUpdate):print("")
+            
                 
-            case .scanSucceeded(scanEntry: let scanEntry, modules: let modulesUpdate, errors: let errors):
+            case .scanSucceeded( modules: let modulesUpdate,scanEntry: let scanEntry, errors: let errors):
+               
                 var modules = modulesUpdate.sorted(by: {
                     if $0.name.contains("Generic Codes") { return true }
                     
@@ -367,28 +452,235 @@ public class CarDrConnectionApi {
                 
                 self.connectionListner?.didReceivedCode(model: self.dtcErrorCodeArray)
                 
-                getDeviceFirmwareVersion()
+         
                 callScanApi()
                
-
+              
+              
+                
+                
+                
             case .scanFailed(errors: let errors):break
-             
-            @unknown default: break
+               
+            @unknown default:break
                 
             }
         }
     }
-    
-    public func getDeviceFirmwareVersion() -> String? {
-        do {
-            let firmwareVersion = try rc.getDeviceFirmwareVersion().get()
-            currentFirmwareVersion = firmwareVersion ?? ""
-            return currentFirmwareVersion
-        } catch {
-            return ""
+   
+    @MainActor
+    func clearCode(completion: @escaping (OperationProgressUpdate) -> Void) {
+
+        Task { [weak self] in
+            guard let self = self else { return }
+
+            if !self.isConnected {
+
+                // 1. Return devices
+                rc.returnDevices { result in
+                    switch result {
+
+                    case .success(let devices):
+                        guard let nearestDevice = devices.sorted(by: { $0.rssi > $1.rssi }).first,
+                              let device = nearestDevice.device else { return }
+
+                        // 2. Connect to device
+                        self.rc.connectToDevice(peripheral: device) { [weak self]
+                            connectionEntry, connectionStage, connectionState in
+
+                            guard let self = self else { return }
+                            self.isConnected = true
+
+                            if connectionStage == .vinReceived {
+                                switch connectionState {
+
+                                case .completed, .failed(_):
+
+                                    Task { [weak self] in
+                                        guard let self = self else { return }
+
+                                        // 1 second delay safely
+                                        try await Task.sleep(nanoseconds: 1_000_000_000)
+
+                                        do {
+                                            try self.rc.clearAllCodes { progress in
+                                                Task { @MainActor in
+                                                    completion(progress)
+                                                }
+                                            }
+                                        } catch {
+                                            print("Error clearing codes: \(error)")
+                                        }
+                                    }
+
+                                default: break
+                                }
+                            }
+                        }
+
+                    case .failure(let error):
+                        print("Error: \(error)")
+
+                    @unknown default:
+                        print("Unknown error")
+                    }
+                }
+
+            } else {
+
+                // Already connected → clear codes directly
+                Task {
+                    try await Task.sleep(nanoseconds: 1_000_000_000)
+
+                    do {
+                        try self.rc.clearAllCodes { progress in
+                            Task { @MainActor in
+                                completion(progress)
+                            }
+                        }
+                    } catch {
+                        print("Error clearing codes: \(error)")
+                    }
+                }
+            }
         }
     }
 
+    func getRecall(autoapRecall:Bool = false,completion: @escaping (RecallResponse) -> Void) {
+        // Ensure safety recall feature is enabled
+      
+        if autoapRecall == true {
+            // New API: VIN-based recall lookup
+            recallRepairSummary(vinNumber: vinNumber) { response in
+                completion(response)
+            }
+        } else {
+            // Old API: Make/Model/Year recall lookup
+            recallRepairSummary(make: make,
+                                   model: model,
+                                   year: yearstr) { response in
+                completion(response)
+            }
+        }
+    }
+    
+    func recallRepairSummary(
+        make: String,
+        model: String,
+        year: String,
+        completion: @escaping (RecallResponse) -> Void
+    ) {
+        let urlString = Constants.NHTSA1 + "\(Constants.recallApi)?make=\(make)&model=\(model)&modelYear=\(year)"
+
+        guard let url = URL(string: urlString) else { return }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+
+        // 🔹 Add headers (same style as your POST example)
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.addValue(Constants.TOKEN_PROD, forHTTPHeaderField: "Authorization") // base64 token
+        request.addValue("ReactApp", forHTTPHeaderField: "App-Type")
+
+        let task = URLSession.shared.dataTask(with: request) { data, response, error in
+
+            if let error = error {
+                print("Recall API error: \(error.localizedDescription)")
+                return
+            }
+
+            guard let data = data else {
+                print("No data returned")
+                return
+            }
+
+            do {
+                if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] {
+
+                    // Convert dictionary → SwiftyJSON.JSON
+                            let json = JSON(json)
+
+                            // Create response object
+                            var response = RecallResponse(json: json)
+
+                            // Sort results by recallDate
+                            response.results.sort {
+                                guard let d1 = $0.recallDate(), let d2 = $1.recallDate() else { return false }
+                                return d1 > d2
+                            }
+
+                            // Return on main thread
+                            DispatchQueue.main.async {
+                                completion(response)
+                            }
+                }
+            } catch {
+                print("JSON Parse Error: \(error.localizedDescription)")
+            }
+        }
+
+        task.resume()
+    }
+
+    
+    func recallRepairSummary(
+        vinNumber: String,
+        completion: @escaping (RecallResponse) -> Void
+    ) {
+        let urlString = Constants.NHTSA + vinNumber
+
+        guard let url = URL(string: urlString) else { return }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+
+        // 🔹 Add headers
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.addValue(Constants.TOKEN_PROD, forHTTPHeaderField: "Authorization")
+        request.addValue("ReactApp", forHTTPHeaderField: "App-Type")
+
+        let task = URLSession.shared.dataTask(with: request) { data, response, error in
+            
+            if let error = error {
+                print("Error fetching recall: \(error.localizedDescription)")
+                return
+            }
+
+            guard let data = data else {
+                print("Empty response")
+                return
+            }
+
+            do {
+                if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] {
+
+                    let json = JSON(json)
+
+                    // Create response object
+                    var response = RecallResponse(json: json)
+
+                    // 🔹 Only safety recalls (V)
+                    var filtered = response.results.filter { $0.isSafetyRecall() }
+
+                    // 🔹 Sort by date descending
+                    filtered.sort {
+                        guard let d1 = $0.recallDate(), let d2 = $1.recallDate() else { return false }
+                        return d1 > d2
+                    }
+
+                    response.results = filtered
+
+                    DispatchQueue.main.async {
+                        completion(response)
+                    }
+                }
+            } catch {
+                print("JSON error: \(error.localizedDescription)")
+            }
+        }
+
+        task.resume()
+    }
 
     
     
@@ -552,7 +844,6 @@ public class CarDrConnectionApi {
         // Handle module updates here if needed
     }
 
-    var fail = 0
     public func getEmissionMonitors(callback: @escaping (_ emissions: [EmissionRediness]) -> Void) {
             isReadinessComplete = false
             emissionList.removeAll()
@@ -588,7 +879,7 @@ public class CarDrConnectionApi {
                 
                 
             }
-            rc.requestMonitors()
+        rc.requestReadinessMonitors(reqType: 3)
         }
     
     public func checkPassFailEmission() -> String {
@@ -730,11 +1021,29 @@ public class CarDrConnectionApi {
         var dtcArr = [[String: String]]()
 
         // Collect unique DTC codes
-        for dtcResponseModel in self.dtcErrorCodeArray {
-            let module = dtcResponseModel.moduleName
-            for dtcResponse in dtcResponseModel.dtcCodeArray {
-                if !dtcArr.contains(where: { $0["code"] == dtcResponse.dtcErrorCode }) {
-                    dtcArr.append(["code": dtcResponse.dtcErrorCode, "module": module])
+        for model in self.dtcErrorCodeArray {
+            let module = model.moduleName
+            for dtc in model.dtcCodeArray {
+                let status = dtc.status.lowercased()
+            
+                    if ((status.contains("active") || status.contains( "confirmed"))  || status.contains("permanent")) {
+                    let removedSpecial = dtc.desc.replacingOccurrences(
+                        of: "[^a-zA-Z0-9 .,]",
+                        with: "",
+                        options: .regularExpression
+                    )
+
+                    // Step 2: Replace multiple whitespace with single space
+                    let collapsedSpaces = removedSpecial.replacingOccurrences(
+                        of: "\\s+",
+                        with: " ",
+                        options: .regularExpression
+                    )
+                    dtcArr.append([
+                        "code": dtc.dtcErrorCode,
+                        "module": module,
+                        "code_desc":collapsedSpaces
+                    ])
                 }
             }
         }
@@ -841,23 +1150,24 @@ public class CarDrConnectionApi {
 
     //MARK  This Function to update the Firmware
     // NOTE  This function  only call after the OBD connected successfully  and any type of scan not run
-    public  func updateFirm(completion: @escaping (String) -> Void) {
+    func updateFirm(completion: @escaping (String) -> Void) {
         Timer.scheduledTimer(withTimeInterval: 10, repeats: false) { timer in
             var result = self.rc.getNewestAvailableFirmwareVersion()
-             var currnt = "2.018.20"
+             var currnt = ""
          
             do{
-                currnt = try result.get() ?? "2.018.20"
+                currnt = try result.get() ?? ""
             }catch{
                 
             }
-         
-          
-    
-            self.rc.startDeviceFirmwareUpdate(reqVersion: currnt,reqReleaseLevel: .production)
+            
+            self.rc.startDeviceFirmwareUpdate(to:currnt,reqReleaseLevel: .production) { versionInDouble in
+                completion("\(versionInDouble)")
+            } completionCallback: { error in
+                completion("Error")
+            }
         }
     }
-
    
     
     func stopFirmware(){
@@ -895,4 +1205,13 @@ extension Array {
             return seen.insert(keyValue).inserted
         }
     }
+}
+struct StreamSample {
+    let ecuKey: String
+    let valueKey: String
+    let title: String
+    let ecuName: String
+    let unit: String
+    let timestamp: Date
+    let displayValue: String
 }

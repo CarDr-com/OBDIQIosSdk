@@ -1,13 +1,22 @@
 {
-  "originHash" : "3565c7fcdaaf2e15c14a37ab0531136e6eaa2f81f469a2eb10d5ee52e9b7be9e",
+  "originHash" : "afc4f68133e17148249062c3ca51265e10100c2361d1dfe544f35557bf9eab11",
   "pins" : [
     {
       "identity" : "repairclubsdk",
       "kind" : "remoteSourceControl",
       "location" : "git@github.com:RRCummins/RepairClubSDK.git",
       "state" : {
-        "revision" : "ebba41696c06314f21d88c9be747f572beb4d8a1",
-        "version" : "1.3.2-beta.1"
+        "revision" : "a0554236b6f7765e5709158fcc46d1fe0ed12185",
+        "version" : "1.5.5-beta.3"
+      }
+    },
+    {
+      "identity" : "swiftyjson",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/SwiftyJSON/SwiftyJSON.git",
+      "state" : {
+        "revision" : "af76cf3ef710b6ca5f8c05f3a31307d44a3c5828",
+        "version" : "5.0.2"
       }
     }
   ],
