@@ -622,15 +622,12 @@ public class CarDrConnectionApi {
                                         // 1 second delay safely
                                         try await Task.sleep(nanoseconds: 1_000_000_000)
 
-                                        do {
-                                            try self.rc.clearAllCodes { progress in
+                                         self.rc.clearAllCodes { progress in
                                                 Task { @MainActor in
                                                     completion(progress)
                                                 }
                                             }
-                                        } catch {
-                                            print("Error clearing codes: \(error)")
-                                        }
+                                       
                                     }
 
                                 default: break
