@@ -663,7 +663,7 @@ public class CarDrConnectionApi {
         }
     }
 
-    func getRecall(autoapRecall:Bool = false,completion: @escaping (RecallResponse) -> Void) {
+    public func getRecall(autoapRecall:Bool = false,completion: @escaping (RecallResponse) -> Void) {
         // Ensure safety recall feature is enabled
         isAutoRecall = autoapRecall
         //if autoapRecall == true {
@@ -967,13 +967,7 @@ public class CarDrConnectionApi {
                         self.scanID = id
                         print("callScanApi: Response Scan ID: \(id)")
 
-                        self.getEmissionMonitors { emissionArray in
-                            // handle
-                        }
-
-                        self.getRecall(autoapRecall: false) { response in
-                            // handle
-                        }
+                        
                     }
 
                 } catch {
