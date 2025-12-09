@@ -62,7 +62,7 @@ public class CarDrConnectionApi {
         getVariable { it in
            
             self.rc.configureSDK(
-                tokenString: "1feddf76-3b99-4c4b-869a-74046daa3e30",
+                tokenString: it?.repairClubToken ?? "",
                 appName: "OBDIQ ULTRA SDK",
                 appVersion: appVersion,
                 userID: "support@cardr.com"
