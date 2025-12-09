@@ -288,7 +288,7 @@ public class CarDrConnectionApi {
     
     
     public  func scanForDevice() {
-        rc.setSampleVehicleOnSim(.fordEdge2018)
+        
             rc.returnDevices { result in
                 switch result {
                 case .success(let devices):
