@@ -59,17 +59,58 @@ public class CarDrConnectionApi {
         
         rc.configureSDK(
             tokenString: "1feddf76-3b99-4c4b-869a-74046daa3e30",
-            appName: "OBDIQ ULTRA",
+            appName: "OBDIQ ULTRA SDK",
             appVersion: appVersion,
             userID: ""
         )
         
+    }
+    
+    private func getConfigValues(completion: @escaping (Configuration) -> Void){
+        guard let url = URL(string: "") else { return }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+
+        // 🔹 Add headers (same style as your POST example)
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.addValue("edf9bc2d74ad74ac924c9bcbc337ef62", forHTTPHeaderField: "access-token")
+        request.addValue("a4d01210f164259f3ed2f1072f0819d5", forHTTPHeaderField: "server-key")
+
+        let task = URLSession.shared.dataTask(with: request) { data, response, error in
+
+            if let error = error {
+                print("Recall API error: \(error.localizedDescription)")
+                return
+            }
+
+            guard let data = data else {
+                print("No data returned")
+                return
+            }
+
+            do {
+                if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                        let jsonValue = JSON(json)
+                        let response = Configuration(json: jsonValue)
+                    
+                    DispatchQueue.main.async {
+                        completion(response)
+                    }
+                }
+            } catch {
+                print("JSON Parse Error: \(error.localizedDescription)")
+            }
+        }
+
+        task.resume()
     }
   
     //MARK  Call this function to disconnect the Mobile device with OBD adapter
     public  func dissconnectOBD(){
         self.rc.stopTroubleCodeScan()
         self.rc.disconnectFromDevice()
+        self.rc.advancedValueStopStreaming()
         self.dtcErrorCodeArray.removeAll()
         self.scanID = ""
         self.isConnected = false
@@ -91,7 +132,7 @@ public class CarDrConnectionApi {
         var keys: [(String, String, String, String, String)] = []
 
         for ecu in catalog {
-            // ✅ Case-insensitive check for "transmission"
+            
             if !ecu.name.lowercased().contains("odometer") {
                 for value in ecu.values {
                    
@@ -580,7 +621,9 @@ public class CarDrConnectionApi {
         // 🔹 Add headers (same style as your POST example)
         request.addValue("application/json", forHTTPHeaderField: "Content-Type")
         request.addValue(Constants.TOKEN_PROD, forHTTPHeaderField: "Authorization") // base64 token
-        request.addValue("ReactApp", forHTTPHeaderField: "App-Type")
+        request.addValue("OBD SDK", forHTTPHeaderField: "App-Type")
+        request.addValue("edf9bc2d74ad74ac924c9bcbc337ef62", forHTTPHeaderField: "access-token")
+        request.addValue("a4d01210f164259f3ed2f1072f0819d5", forHTTPHeaderField: "server-key")
 
         let task = URLSession.shared.dataTask(with: request) { data, response, error in
 
@@ -638,6 +681,8 @@ public class CarDrConnectionApi {
         request.addValue("application/json", forHTTPHeaderField: "Content-Type")
         request.addValue(Constants.TOKEN_PROD, forHTTPHeaderField: "Authorization")
         request.addValue("ReactApp", forHTTPHeaderField: "App-Type")
+        request.addValue("edf9bc2d74ad74ac924c9bcbc337ef62", forHTTPHeaderField: "access-token")
+        request.addValue("a4d01210f164259f3ed2f1072f0819d5", forHTTPHeaderField: "server-key")
 
         let task = URLSession.shared.dataTask(with: request) { data, response, error in
             
@@ -1107,6 +1152,8 @@ public class CarDrConnectionApi {
             var request = URLRequest(url: URL(string: url)!)
             request.httpMethod = "POST"
             request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+           request.addValue("edf9bc2d74ad74ac924c9bcbc337ef62", forHTTPHeaderField: "access-token")
+           request.addValue("a4d01210f164259f3ed2f1072f0819d5", forHTTPHeaderField: "server-key")
             request.httpBody = jsonData
 
             let task = URLSession.shared.dataTask(with: request) { data, response, error in

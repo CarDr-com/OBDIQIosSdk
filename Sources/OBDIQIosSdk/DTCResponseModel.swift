@@ -191,3 +191,26 @@ class RecallResult {
         return nil
     }
 }
+
+class Configuration {
+    var autoAppUrl :String?
+    var nhtsaUrl:String?
+    var recallToken :String?
+   
+    var scan :String?
+    var repairCost :String?
+    var repairInfo :String?
+    var recallApi :String?
+    var repairClubToken :String?
+    
+    init(json:JSON){
+        self.autoAppUrl = json["auto_app_url"].stringValue
+        self.nhtsaUrl = json["nhtsa_url"].stringValue
+        self.recallToken = json["recallToken"].stringValue
+        self.scan = json["scan"].stringValue
+        self.repairCost = json["repairCost"].stringValue
+        self.repairInfo = json["repairInfo"].stringValue
+        self.recallApi = json["recallApi"].stringValue
+        self.repairClubToken = json["repairClubToken"].stringValue
+    }
+}
