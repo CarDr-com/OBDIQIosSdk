@@ -214,3 +214,33 @@ class Configuration {
         self.repairClubToken = json["repairClubToken"].stringValue
     }
 }
+struct VariableData {
+    let id: Int?
+    let isDeleted: Int?
+    let recallToken: String?
+    let repairClubToken: String?
+    let autoAppUrl: String?
+    let scan: String?
+    let nhtsaUrl: String?
+    let repairCost: String?
+    let recallApi: String?
+    let repairInfo: String?
+    let createdAt: String?
+    let updatedAt: String?
+
+    init(json: JSON) {
+        self.id = json["data"]["id"].intValue
+        self.isDeleted = json["data"]["is_deleted"].intValue
+        self.recallToken = json["data"]["recallToken"].stringValue
+        self.repairClubToken = json["data"]["repairClubToken"].stringValue
+        self.autoAppUrl = json["data"]["autoAppUrl"].stringValue
+        self.scan = json["data"]["scan"].stringValue
+        self.nhtsaUrl = json["data"]["nhtsaUrl"].stringValue
+        self.repairCost = json["data"]["repairCost"].stringValue
+        self.recallApi = json["data"]["recallApi"].stringValue
+        self.repairInfo = json["data"]["repairInfo"].stringValue
+        self.createdAt = json["data"]["createdAt"].stringValue
+        self.updatedAt = json["data"]["updatedAt"].stringValue
+    }
+}
+

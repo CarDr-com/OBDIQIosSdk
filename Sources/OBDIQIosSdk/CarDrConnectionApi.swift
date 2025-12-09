@@ -30,7 +30,7 @@ public class CarDrConnectionApi {
     private var emissionList = [EmissionRediness]()
         private var isReadinessComplete = false
         private var passFail = ""
-        
+     private var controller = [ModuleItem]()
         private var warmUpCyclesSinceCodesCleared: Double = 0.0
         private var warmUpCyclesSinceCodesClearedStr = "-"
         
@@ -42,10 +42,13 @@ public class CarDrConnectionApi {
         
         private var timeRunWithMILOn: Int = 0
         private var timeRunWithMILOnStr = "-"
+    private var  variableData:VariableData? = nil
+    private var recallResponse:RecallResponse? = nil
     var scanID = ""
     var isMilOn = false
     var dictonary = [String: Any]()
     var connectionStates: [ConnectionStage: ConnectionState] = [:]
+    var isAutoRecall = false
 
     public var connectionHandler: ((ConnectionEntry, ConnectionStage, ConnectionState?) -> Void)? = nil
 
@@ -56,15 +59,70 @@ public class CarDrConnectionApi {
         self.connectionListner = listener
         let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
 
-        
-        rc.configureSDK(
-            tokenString: "1feddf76-3b99-4c4b-869a-74046daa3e30",
-            appName: "OBDIQ ULTRA SDK",
-            appVersion: appVersion,
-            userID: ""
-        )
+        getVariable { it in
+           
+            self.rc.configureSDK(
+                tokenString: "1feddf76-3b99-4c4b-869a-74046daa3e30",
+                appName: "OBDIQ ULTRA SDK",
+                appVersion: appVersion,
+                userID: "support@cardr.com"
+            )
+            self.connectionListner?.didScanForDevice(startScan: true)
+        }
+       
         
     }
+    
+    
+    private func getVariable(completion: @escaping (VariableData?) -> Void) {
+
+        guard let url = URL(string: Constants.GET_VARIABLE_URL) else {
+            print("Invalid URL")
+            return
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.addValue("edf9bc2d74ad74ac924c9bcbc337ef62", forHTTPHeaderField: "access-token")
+        request.addValue("a4d01210f164259f3ed2f1072f0819d5", forHTTPHeaderField: "server-key")
+
+        let task = URLSession.shared.dataTask(with: request) { data, response, error in
+
+            if let error = error {
+                print("API Error: \(error.localizedDescription)")
+                completion(nil)
+                return
+            }
+
+            guard let data = data else {
+                print("No data received")
+                completion(nil)
+                return
+            }
+
+            do {
+                if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                    
+                    let jsonValue = JSON(json)
+                    let responseObj = VariableData(json: jsonValue)
+                    
+
+                    DispatchQueue.main.async {
+                        self.variableData = responseObj
+                        completion(responseObj)
+                    }
+                }
+            } catch {
+                print("JSON decode error: \(error.localizedDescription)")
+                completion(nil)
+            }
+        }
+
+        task.resume()
+    }
+
     
     private func getConfigValues(completion: @escaping (Configuration) -> Void){
         guard let url = URL(string: "") else { return }
@@ -117,134 +175,120 @@ public class CarDrConnectionApi {
         self.isMilOn = false
         self.emissionList.removeAll()
         self.clearCodesReset()
+        self.controller.removeAll()
         
     }
     
-    func loadAdvancedValueCatalog() -> [RepairClubSDK.AVECU] {
-        let catalog = rc.advancedValueOperationCatalog(set: "avr_transmission_test")
-
-       
-          return catalog
-      }
-   
-  
-    func buildKeys(from catalog: [RepairClubSDK.AVECU]) -> [(ecuKey: String, valueKey: String, valueName: String, unit: String, ecuName: String)] {
-        var keys: [(String, String, String, String, String)] = []
-
-        for ecu in catalog {
-            
-            if !ecu.name.lowercased().contains("odometer") {
-                for value in ecu.values {
-                   
-                    keys.append((ecu.key, value.key, value.name, value.unit ?? "", ecu.name))
-                }
-          }
-        }
-
-        return keys
-    }
-
-
-
- 
-//    func requestValuesOnce(from catalog: [RepairClubSDK.AVECU]) {
-//        let keys = buildKeys(from: catalog)
+//   private func loadAdvancedValueCatalog() -> [RepairClubSDK.AVECU] {
+//        let catalog = rc.advancedValueOperationCatalog(set: "avr_transmission_test")
 //
-//        rc.advancedValueRequestOnce(keys: keys) { readings in
-//            for reading in readings {
-//                print("Reading from: \(reading.title) [\(reading.unit ?? "-")]")
+//       
+//          return catalog
+//      }
+//   
+//  
+//    private func buildKeys(from catalog: [RepairClubSDK.AVECU]) -> [(ecuKey: String, valueKey: String, valueName: String, unit: String, ecuName: String)] {
+//        var keys: [(String, String, String, String, String)] = []
 //
-//                for sample in reading.values {
-//                    let timestamp = sample.date
-//                    let valueString = sample.value.description
-//                    print(" - \(timestamp): \(valueString)")
+//        for ecu in catalog {
+//            
+//            if !ecu.name.lowercased().contains("odometer") {
+//                for value in ecu.values {
+//                   
+//                    keys.append((ecu.key, value.key, value.name, value.unit ?? "", ecu.name))
 //                }
-//            }
+//          }
 //        }
+//
+//        return keys
 //    }
 //
 //
-   
-
-    func
-    
-    startStreaming(from catalog: [RepairClubSDK.AVECU],
-                        onUpdate: @escaping ([StreamSample]) -> Void) {
-        let keys = buildKeys(from: catalog)
-
-        // Pre-fill samples with placeholders using value.name for title
-        var samples = keys.map { (ecuKey, valueKey, valueName,unit,ecuName) in
-            StreamSample(
-                ecuKey: ecuKey,
-                valueKey: valueKey,
-                title: valueName,
-                ecuName: ecuName,
-                unit: unit,
-                timestamp: Date(),
-                displayValue: "Waiting..."
-            )
-        }
-
-        // Flatten keys to pass into SDK
-        let flatKeys = keys.map { ($0.ecuKey, $0.valueKey) }
-
-        rc.advancedValueStartStreaming(keys: flatKeys) { readings in
-            for reading in readings {
-                let ecuKey = reading.ecuKey
-                let valueKey = reading.valueKey
-              
-
-                for sample in reading.values {
-                    let timestamp = sample.date
-                    let displayValue: String
-
-                    switch sample.value {
-                    case .number(let d):
-                        displayValue = "\(d)"
-                    case .text(let s),
-                         .enumeration(let s),
-                         .raw(let s):
-                        displayValue = s
-                    case .noData:
-                        displayValue = "N/A"
-                    case .nrc(let code):
-                        displayValue = "Unavailable (\(code))"
-                    @unknown default:
-                        displayValue = "Unknown"
-                    }
-                    
-                    if displayValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
-                                    displayValue == "0" || displayValue == "0.0" {
-                                    continue
-                                }
-                    let preciseDate = Date()
-                    // Find index in samples
-                    if let index = samples.firstIndex(where: {
-                        $0.ecuKey == ecuKey && $0.valueKey == valueKey
-                    }) {
-                       
-                        let existing = samples[index]
-                        samples[index] = StreamSample(
-                            ecuKey: ecuKey,
-                            valueKey: valueKey,
-                            title: existing.title,
-                            ecuName: existing.ecuName,
-                            unit: existing.unit,
-                            timestamp: preciseDate,
-                            displayValue: displayValue
-                        )
-                    }
-                }
-            }
-
-            onUpdate(samples)
-           
-        }
-    }
+//
+// 
+//
+//   
+//
+//    private func
+//    
+//    startStreaming(from catalog: [RepairClubSDK.AVECU],
+//                        onUpdate: @escaping ([StreamSample]) -> Void) {
+//        let keys = buildKeys(from: catalog)
+//
+//        // Pre-fill samples with placeholders using value.name for title
+//        var samples = keys.map { (ecuKey, valueKey, valueName,unit,ecuName) in
+//            StreamSample(
+//                ecuKey: ecuKey,
+//                valueKey: valueKey,
+//                title: valueName,
+//                ecuName: ecuName,
+//                unit: unit,
+//                timestamp: Date(),
+//                displayValue: "Waiting..."
+//            )
+//        }
+//
+//        // Flatten keys to pass into SDK
+//        let flatKeys = keys.map { ($0.ecuKey, $0.valueKey) }
+//
+//        rc.advancedValueStartStreaming(keys: flatKeys) { readings in
+//            for reading in readings {
+//                let ecuKey = reading.ecuKey
+//                let valueKey = reading.valueKey
+//              
+//
+//                for sample in reading.values {
+//                    let timestamp = sample.date
+//                    let displayValue: String
+//
+//                    switch sample.value {
+//                    case .number(let d):
+//                        displayValue = "\(d)"
+//                    case .text(let s),
+//                         .enumeration(let s),
+//                         .raw(let s):
+//                        displayValue = s
+//                    case .noData:
+//                        displayValue = "N/A"
+//                    case .nrc(let code):
+//                        displayValue = "Unavailable (\(code))"
+//                    @unknown default:
+//                        displayValue = "Unknown"
+//                    }
+//                    
+//                    if displayValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+//                                    displayValue == "0" || displayValue == "0.0" {
+//                                    continue
+//                                }
+//                    let preciseDate = Date()
+//                    // Find index in samples
+//                    if let index = samples.firstIndex(where: {
+//                        $0.ecuKey == ecuKey && $0.valueKey == valueKey
+//                    }) {
+//                       
+//                        let existing = samples[index]
+//                        samples[index] = StreamSample(
+//                            ecuKey: ecuKey,
+//                            valueKey: valueKey,
+//                            title: existing.title,
+//                            ecuName: existing.ecuName,
+//                            unit: existing.unit,
+//                            timestamp: preciseDate,
+//                            displayValue: displayValue
+//                        )
+//                    }
+//                }
+//            }
+//
+//            onUpdate(samples)
+//           
+//        }
+//    }
 
     
     
     public  func scanForDevice() {
+        rc.setSampleVehicleOnSim(.fordEdge2018)
             rc.returnDevices { result in
                 switch result {
                 case .success(let devices):
@@ -353,12 +397,37 @@ public class CarDrConnectionApi {
                                  }
             case .configDownloaded:
                 self.isConnected = true
+                switch connectionState {
+                case .completed:print("Complete")
+                    
+                case .failed (let error):
+                     
                     self.connectionListner?.isReadyForScan(status: true, isGeneric: true)
+       
+                case .manuallyEntered, .started, .notStarted: break
+                   
+                @unknown default:
+                    self.connectionListner?.isReadyForScan(status: true, isGeneric: true)
+                }
+               
+                   
                 
 
                
             case .busSyncedToConfig:
-                self.connectionListner?.isReadyForScan(status: true,isGeneric: false)
+                switch connectionState {
+                case .completed:
+                    self.connectionListner?.isReadyForScan(status: true,isGeneric: false)
+                case .failed(let error):
+                    self.connectionListner?.isReadyForScan(status: true, isGeneric: true)
+                   
+                case .manuallyEntered, .started, .notStarted: break
+                 
+                @unknown default:
+                   
+                    self.connectionListner?.isReadyForScan(status: true, isGeneric: true)
+                    }
+               
                
             case .milChecking:
                 if !isMilOn {
@@ -425,7 +494,7 @@ public class CarDrConnectionApi {
                 
                 let percent = String(format: "%.2f", per * 100)
                 
-             
+                self.connectionListner?.didUpdateProgress(progressStatus: "progressupdate", percent: percent)
             case .moduleScanningUpdate(moduleName: let moduleName):
                 print("ModuleName ======= \(moduleName)")
             case .modulesUpdate(modules: let modulesUpdate):print("")
@@ -435,29 +504,39 @@ public class CarDrConnectionApi {
                
                 var modules = modulesUpdate.sorted(by: {
                     if $0.name.contains("Generic Codes") { return true }
-                    
                     if $1.name.contains("Generic Codes") { return false }
-                    
-                    let responseOrder: [ResponseStatus: Int] = [.responded:
-                                                                    1, .awaitingDecode: 2, .didNotRespond: 3, .unknown: 4]
-                    if responseOrder[$0.responseStatus]! <
-                        responseOrder[$1.responseStatus]! { return true }
-                    if responseOrder[$0.responseStatus]! >
-                        responseOrder[$1.responseStatus]! { return false }
-                    
+
+                    let responseOrder: [ResponseStatus: Int] = [
+                        .responded: 1,
+                        .awaitingDecode: 2,
+                        .didNotRespond: 3,
+                        .unknown: 4
+                    ]
+
+                    let order0 = responseOrder[$0.responseStatus] ?? Int.max
+                    let order1 = responseOrder[$1.responseStatus] ?? Int.max
+
+                    if order0 != order1 {
+                        return order0 < order1
+                    }
+
                     if !$0.codes.isEmpty && $1.codes.isEmpty { return true }
-                    if $0.codes.isEmpty && !$1.codes.isEmpty { return false}
-                    // Finally, sort alphabetically
+                    if $0.codes.isEmpty && !$1.codes.isEmpty { return false }
+
                     return $0.name < $1.name
                 })
-               
+                
+                let distinctModules = Array(Set(modules.map { $0.name })).compactMap { name in
+                    modules.first { $0.name == name }
+                }
+                controller.append(contentsOf: distinctModules)
                 let codesCount = modules.reduce(0) { $0 + $1.codes.count }
                
                        
                 // Get distinct modules by name
                 var dtcErrorCodeList = [DTCResponseModel]()
                         // Get distinct modules by name
-                        let distinctModules = modules.distinctBy { $0.name }
+                       
                         
                         for module in distinctModules {
                             let moduleName = module.name
@@ -589,20 +668,28 @@ public class CarDrConnectionApi {
 
     func getRecall(autoapRecall:Bool = false,completion: @escaping (RecallResponse) -> Void) {
         // Ensure safety recall feature is enabled
-      
-        if autoapRecall == true {
+        isAutoRecall = autoapRecall
+        //if autoapRecall == true {
             // New API: VIN-based recall lookup
             recallRepairSummary(vinNumber: vinNumber) { response in
+                self.recallResponse = response
+                self.postOBDData { _,_ in
+                    
+                }
                 completion(response)
             }
-        } else {
-            // Old API: Make/Model/Year recall lookup
-            recallRepairSummary(make: make,
-                                   model: model,
-                                   year: yearstr) { response in
-                completion(response)
-            }
-        }
+//        } else {
+//            // Old API: Make/Model/Year recall lookup
+//            recallRepairSummary(make: make,
+//                                   model: model,
+//                                   year: yearstr) { response in
+//                self.recallResponse = response
+//                self.postOBDData { _,_ in
+//                    
+//                }
+//                completion(response)
+//            }
+//        }
     }
     
     func recallRepairSummary(
@@ -611,7 +698,14 @@ public class CarDrConnectionApi {
         year: String,
         completion: @escaping (RecallResponse) -> Void
     ) {
-        let urlString = Constants.NHTSA1 + "\(Constants.recallApi)?make=\(make)&model=\(model)&modelYear=\(year)"
+        guard let nhtsaUrl = variableData?.nhtsaUrl,
+                  let recallApi = variableData?.recallApi else {
+                print("❌ Missing API URL components")
+                return
+            }
+
+        let urlString = "\(nhtsaUrl)\(recallApi)?make=\(make)&model=\(model)&modelYear=\(year)"
+
 
         guard let url = URL(string: urlString) else { return }
 
@@ -620,7 +714,7 @@ public class CarDrConnectionApi {
 
         // 🔹 Add headers (same style as your POST example)
         request.addValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.addValue(Constants.TOKEN_PROD, forHTTPHeaderField: "Authorization") // base64 token
+        request.addValue(variableData?.recallToken ?? "", forHTTPHeaderField: "Authorization")
         request.addValue("OBD SDK", forHTTPHeaderField: "App-Type")
         request.addValue("edf9bc2d74ad74ac924c9bcbc337ef62", forHTTPHeaderField: "access-token")
         request.addValue("a4d01210f164259f3ed2f1072f0819d5", forHTTPHeaderField: "server-key")
@@ -670,7 +764,13 @@ public class CarDrConnectionApi {
         vinNumber: String,
         completion: @escaping (RecallResponse) -> Void
     ) {
-        let urlString = Constants.NHTSA + vinNumber
+        guard let nhtsaUrl = variableData?.autoAppUrl
+        else {
+                print("❌ Missing API URL components")
+                return
+            }
+
+        let urlString = "\(nhtsaUrl)/\(vinNumber)"
 
         guard let url = URL(string: urlString) else { return }
 
@@ -679,7 +779,7 @@ public class CarDrConnectionApi {
 
         // 🔹 Add headers
         request.addValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.addValue(Constants.TOKEN_PROD, forHTTPHeaderField: "Authorization")
+        request.addValue(variableData?.recallToken ?? "", forHTTPHeaderField: "Authorization")
         request.addValue("ReactApp", forHTTPHeaderField: "App-Type")
         request.addValue("edf9bc2d74ad74ac924c9bcbc337ef62", forHTTPHeaderField: "access-token")
         request.addValue("a4d01210f164259f3ed2f1072f0819d5", forHTTPHeaderField: "server-key")
@@ -697,9 +797,10 @@ public class CarDrConnectionApi {
             }
 
             do {
-                if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] {
-
-                    let json = JSON(json)
+               // if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                let responseText = String(data: data, encoding: .utf8)
+                print(responseText)
+                    let json = JSON(data)
 
                     // Create response object
                     var response = RecallResponse(json: json)
@@ -718,7 +819,7 @@ public class CarDrConnectionApi {
                     DispatchQueue.main.async {
                         completion(response)
                     }
-                }
+               // }
             } catch {
                 print("JSON error: \(error.localizedDescription)")
             }
@@ -799,17 +900,16 @@ public class CarDrConnectionApi {
             }
 
         // Get unique module names, excluding "generic" and "standard"
-        let uniqueControllerArr = Set(
-            dtcErrorCodeArray
-                .filter { $0.responseStatus == ResponseStatus.responded.rawValue }
-                .compactMap { $0.moduleName }
-                .filter { !$0.localizedCaseInsensitiveContains("generic") && !$0.localizedCaseInsensitiveContains("standard") }
-        ).sorted()
+      
 
-
+        var controllerArr = [String]()
+        let filteredModules = filterModules(filterNonGenericModules(self.controller))
+        filteredModules.forEach { item in
+            controllerArr.append(item.name)
+        }
 
         let parameters: [String: Any] = [
-            "modules": uniqueControllerArr,
+            "modules": controllerArr,
             "vin_number": vinNumber,
             "count_generic": genericCount,
             "odometer": "",
@@ -825,8 +925,15 @@ public class CarDrConnectionApi {
             "serial_number": hardwareIdentifier,
             "dtc_codes": dtcArr
         ]
+        
+        guard let scan = variableData?.scan
+        else {
+                print("❌ Missing API URL components")
+                return
+            }
 
-        guard let url = URL(string: Constants.BASE_URL + Constants.scan) else {
+
+        guard let url = URL(string: Constants.BASE_URL + scan) else {
             print("Invalid URL")
             return
         }
@@ -853,11 +960,25 @@ public class CarDrConnectionApi {
                 }
 
                 do {
-                    if let jsonResponse = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-                       let scanId = jsonResponse["id"] as? String, !scanId.isEmpty {
-                        self.scanID = scanId
-                        print("callScanApi: Response ID: \(scanId)")
+                    if let jsonResponse = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+//                       let dataDict = jsonResponse["data"] as? [String: Any],
+//                       let scanId = dataDict["id"] as? String,
+//                       !scanId.isEmpty
+                    {
+                        let json = JSON(jsonResponse)
+                        let id = json["data"]["id"].stringValue
+                        self.scanID = id
+                        print("callScanApi: Response Scan ID: \(id)")
+
+                        self.getEmissionMonitors { emissionArray in
+                            // handle
+                        }
+
+                        self.getRecall(autoapRecall: false) { response in
+                            // handle
+                        }
                     }
+
                 } catch {
                     print("callScanApi: JSON Parsing Error: \(error.localizedDescription)")
                 }
@@ -868,7 +989,16 @@ public class CarDrConnectionApi {
         }
     }
 
-
+    private func filterNonGenericModules(_ modules: [ModuleItem]) -> [ModuleItem] {
+        return modules.filter {
+            !$0.name.lowercased().contains("generic") && $0.name != "Standard Codes"
+        }
+    }
+    private func filterModules(_ modules: [ModuleItem]) -> [ModuleItem] {
+        return modules.filter {
+            $0.responseStatus == .responded
+        }
+    }
     private func sortModules(modules: [RepairClubSDK.ModuleItem]) -> [RepairClubSDK.ModuleItem] {
         return modules.sorted {
             if $0.name.contains("Generic Codes") { return true }
@@ -916,6 +1046,11 @@ public class CarDrConnectionApi {
                             self.fail = self.fail + 1
                         }
                     }
+                
+                    self.postOBDData(completion:
+                                        {_,_ in 
+                        
+                    })
                     callback(self.emissionList)
                    
                 } catch {
@@ -1108,12 +1243,16 @@ public class CarDrConnectionApi {
         var failedChunks = 0
 
         var jsonResponses: [[String: Any]] = []
-
+        guard let repairInfo = variableData?.repairInfo
+        else {
+                print("❌ Missing API URL components")
+                return
+            }
         for chunk in dtcArrChunks {
             dispatchGroup.enter()
             let chunkParams: [String: Any] = ["dtcCode": chunk, "vin": vinNumber]
 
-            callApiJSON(url: Constants.BASE_URL + Constants.chatgpt, params: chunkParams) { status, response in
+            callApiJSON(url: Constants.BASE_URL + repairInfo, params: chunkParams) { status, response in
                 queue.async(flags: .barrier) { // Ensures thread safety
                     if status, let jsonData = response {
                         jsonResponses.append(jsonData) // Store successful response
@@ -1180,7 +1319,12 @@ public class CarDrConnectionApi {
             guard !scanID.isEmpty, !dtcErrorCodeArray.isEmpty else { return }
 
             let response = makeJsonOfResponse(jsonObject: jsonObject)
-            callApiJSON(url: Constants.BASE_URL + Constants.repaircost, params: response) { status, response in
+            guard let repaircost = variableData?.repairCost
+            else {
+                    print("❌ Missing API URL components")
+                    return
+                }
+            callApiJSON(url: Constants.BASE_URL + repaircost, params: response) { status, response in
                 print("Repair Cost API Response: \(String(describing: response))")
             }
         }
@@ -1221,7 +1365,129 @@ public class CarDrConnectionApi {
         self.rc.stopDeviceFirmwareUpdate()
     }
     
-    
+    private func postOBDData(completion: @escaping (Bool, String?) -> Void) {
+
+        guard let url = URL(string: Constants.BASE_URL+"update") else {
+            print("Invalid URL")
+            completion(false, "Invalid URL")
+            return
+        }
+        
+        // MARK: 🔹 Create Rediness Array
+        var redinessArray: [[String: Any]] = []
+        
+        self.emissionList.forEach { rediness in
+            var item: [String: Any] = [:]
+            item["description"] = rediness.des
+            item["available"] = rediness.available
+            item["complete"] = rediness.complete
+            item["name"] = rediness.name
+            item["finalstatus"] = checkPassFailEmission()
+            
+            redinessArray.append(item)
+        }
+        
+        // MARK: 🔹 Create Code Reset Dictionary
+        var codereset: [String: Any] = [:]
+        codereset["warm_up_cycles_since_codes_cleared"] = self.warmUpCyclesSinceCodesClearedStr
+        codereset["distance_since_codes_cleared"] = self.distanceSinceCodesClearedStr
+        codereset["time_since_trouble_codes_cleared"] = self.timeSinceTroubleCodesClearedStr
+        codereset["time_run_with_MIL_on"] = self.timeRunWithMILOnStr
+        codereset["suspicion_level"] = isManualResetSuspected()
+        
+        if isManualResetSuspected() == 0 {
+            codereset["suspicion_passfail"] = "FAIL"
+        } else if isManualResetSuspected() == 1 {
+            codereset["suspicion_passfail"] = "PASS"
+        } else {
+            codereset["suspicion_passfail"] = "N/A"
+        }
+        
+        
+        // MARK: 🔹 Create Recall Array
+        var recallHis: [[String: Any]] = []
+        
+        if let recallResponse = recallResponse {
+            recallResponse.results.forEach { recall in
+                var item: [String: Any] = [:]
+                
+                if isAutoRecall {
+                    // New VIN-based API
+                    item["NHTSACampaignNumber"] = recall.nhtsaCampaignNumber ?? "N/A"
+                    item["NHTSAActionNumber"]   = recall.mfgCampaignNumber ?? "N/A"
+                    item["ReportReceivedDate"]  = recall.nhtsaRecallDate ?? "N/A"
+                    item["Component"]           = recall.componentDescriptionrecall
+                    item["Remedy"]              = recall.correctiveSummary ?? "N/A"
+                    item["Notes"]               = recall.recallNotes ?? "N/A"
+                    item["StopSale"]            = (recall.stopSale?.uppercased() == "YES") ? "YES" : "-"
+                    item["Summary"]             = recall.subject ?? recall.defectSummary ?? "N/A"
+                    item["Consequence"]         = recall.consequenceSummary ?? "N/A"
+                    
+                } else {
+                    // Old NHTSA API
+                    if let actionNumber = recall.actionNumber, !actionNumber.isEmpty {
+                        item["NHTSAActionNumber"] = actionNumber
+                    }
+                    item["NHTSACampaignNumber"] = recall.campaignNumber ?? "N/A"
+                    item["ReportReceivedDate"]  = recall.reportReceivedDate ?? "N/A"
+                    item["Component"]           = recall.component ?? "N/A"
+                    item["Summary"]             = recall.summary ?? "N/A"
+                    item["Consequence"]         = recall.consequence ?? "N/A"
+                    item["Remedy"]              = recall.remedy ?? "N/A"
+                    item["Notes"]               = recall.notes ?? "N/A"
+                }
+                
+                recallHis.append(item)
+            }
+        }
+        
+        
+        // MARK: 🔹 Build FINAL JSON Body
+        let body: [String: Any] = [
+            "scan_id": scanID,
+            "code_reset": codereset,
+            "emmission": redinessArray,
+            "recall_history": recallHis
+        ]
+        
+
+        // Convert to raw JSON data
+        guard let httpBody = try? JSONSerialization.data(withJSONObject: body, options: []) else {
+            print("Error encoding JSON")
+            completion(false, "JSON encoding error")
+            return
+        }
+        
+        
+        // MARK: 🔹 Create Request
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.httpBody = httpBody
+        
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.addValue("edf9bc2d74ad74ac924c9bcbc337ef62", forHTTPHeaderField: "access-token")
+        request.addValue("a4d01210f164259f3ed2f1072f0819d5", forHTTPHeaderField: "server-key")
+        
+        
+        // MARK: 🔹 Send Request
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            
+            if let error = error {
+                completion(false, error.localizedDescription)
+                return
+            }
+            
+            guard let data = data else {
+                completion(false, "No data")
+                return
+            }
+            
+            let responseText = String(data: data, encoding: .utf8)
+            completion(true, responseText)
+            
+        }.resume()
+    }
+
 
     
     

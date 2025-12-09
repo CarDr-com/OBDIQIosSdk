@@ -8,11 +8,6 @@
 import Foundation
 struct Constants {
     static let BASE_URL = "https://test.obdiq.com/api/v1/sdk/"
-    static let NHTSA = ""
-    static let NHTSA1 = ""
-    static let TOKEN_PROD = ""
-    static let scan = ""
-    static let repaircost = ""
-    static let chatgpt = ""
-    static let recallApi = ""
+    static let GET_VARIABLE_URL = "https://test.obdiq.com/api/v1/get-variable"
+  
 }
