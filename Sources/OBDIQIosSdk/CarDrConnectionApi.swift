@@ -1332,7 +1332,7 @@ public class CarDrConnectionApi {
 
     //MARK  This Function to update the Firmware
     // NOTE  This function  only call after the OBD connected successfully  and any type of scan not run
-    func updateFirm(completion: @escaping (String) -> Void) {
+   public func updateFirm(completion: @escaping (String) -> Void) {
         Timer.scheduledTimer(withTimeInterval: 10, repeats: false) { timer in
             var result = self.rc.getNewestAvailableFirmwareVersion()
              var currnt = ""
