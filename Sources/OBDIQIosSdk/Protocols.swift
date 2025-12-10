@@ -17,4 +17,5 @@ public protocol ConnectionListener {
     func didReceivedCode(model: [DTCResponseModel]?)
     func didReceivedRepairCost(jsonString: String)
     func didScanForDevice(startScan: Bool)
+    func didReadyForRepairInfo(isReady: Bool)
 }

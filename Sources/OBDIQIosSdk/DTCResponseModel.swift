@@ -9,20 +9,20 @@ import Foundation
 import SwiftyJSON
 
 
-struct DTCResponse {
-    var dtcErrorCode: String = ""
-    var desc: String = ""
-    var status: String = ""
-    var name: String = ""
-    var section: String = ""
+public struct DTCResponse {
+    public var dtcErrorCode: String = ""
+    public var desc: String = ""
+    public var status: String = ""
+    public var name: String = ""
+    public var section: String = ""
 }
 
 public class DTCResponseModel {
-    var id: String? = nil
-    var moduleName: String = ""
-    var responseStatus: String? = nil
-    var identifier: String = ""
-    var dtcCodeArray: [DTCResponse] = []
+    public var id: String? = nil
+    public var moduleName: String = ""
+    public var responseStatus: String? = nil
+    public var identifier: String = ""
+    public var dtcCodeArray: [DTCResponse] = []
 
     // Function to remove duplicate DTCResponses based on dtcErrorCode
     func removeDuplicateDTCResponses() {
@@ -39,16 +39,16 @@ public class DTCResponseModel {
     }
 }
 
-class RecallResponse {
-    var vin: String?
-    var year: String?
-    var makeName: String?
-    var modelName: String?
-    var styleName: String?
-    var sourceIdentifier: String?
-    var storeIdentifier: String?
-    var vehicleNotes: String?
-    var results: [RecallResult] = []
+public class RecallResponse {
+    public var vin: String?
+    public var year: String?
+    public var makeName: String?
+    public var modelName: String?
+    public var styleName: String?
+    public var sourceIdentifier: String?
+    public var storeIdentifier: String?
+    public var vehicleNotes: String?
+    public var results: [RecallResult] = []
     
     init(json: JSON) {
         if json["openRecalls"].exists() {
@@ -77,41 +77,41 @@ class RecallResponse {
     }
 }
 
-class RecallResult {
+public class RecallResult {
     // 🔹 Common / Old API fields
-    var manufacturer: String?
-    var campaignNumber: String?
-    var actionNumber: String?
-    var reportReceivedDate: String?
-    var component: String?
-    var summary: String?
-    var consequence: String?
-    var remedy: String?
-    var notes: String?
-    var modelYear: String?
-    var make: String?
-    var model: String?
+    public var manufacturer: String?
+    public var campaignNumber: String?
+    public var actionNumber: String?
+    public var reportReceivedDate: String?
+    public var component: String?
+    public var summary: String?
+    public var consequence: String?
+    public var remedy: String?
+    public var notes: String?
+    public var modelYear: String?
+    public var make: String?
+    public var model: String?
     
     // 🔹 New API fields
-    var status: String?
-    var noRemedy: Bool = false
-    var recallTypeCode: String?
-    var nhtsaCampaignNumber: String?
-    var mfgCampaignNumber: String?
-    var bulletinNumber: String?
-    var componentDescriptionrecall: String?
-    var subject: String?
-    var emissionsRelated: Bool = false
-    var mfgName: String?
-    var mfgText: String?
-    var defectSummary: String?
-    var consequenceSummary: String?
-    var correctiveSummary: String?
-    var recallNotes: String?
-    var fmvss: String?
-    var stopSale: String?
-    var nhtsaRecallDate: String?
-    var vehicleRecallUuid: String?
+    public var status: String?
+    public var noRemedy: Bool = false
+    public var recallTypeCode: String?
+    public var nhtsaCampaignNumber: String?
+    public var mfgCampaignNumber: String?
+    public var bulletinNumber: String?
+    public var componentDescriptionrecall: String?
+    public var subject: String?
+    public var emissionsRelated: Bool = false
+    public var mfgName: String?
+    public var mfgText: String?
+    public var defectSummary: String?
+    public var consequenceSummary: String?
+    public var correctiveSummary: String?
+    public var recallNotes: String?
+    public var fmvss: String?
+    public var stopSale: String?
+    public var nhtsaRecallDate: String?
+    public var vehicleRecallUuid: String?
     
     // MARK: - Initializers
     
@@ -193,15 +193,15 @@ class RecallResult {
 }
 
 class Configuration {
-    var autoAppUrl :String?
-    var nhtsaUrl:String?
-    var recallToken :String?
+    public var autoAppUrl :String?
+    public var nhtsaUrl:String?
+    public var recallToken :String?
    
-    var scan :String?
-    var repairCost :String?
-    var repairInfo :String?
-    var recallApi :String?
-    var repairClubToken :String?
+    public var scan :String?
+    public var repairCost :String?
+    public var repairInfo :String?
+    public var recallApi :String?
+    public var repairClubToken :String?
     
     init(json:JSON){
         self.autoAppUrl = json["auto_app_url"].stringValue
@@ -215,18 +215,18 @@ class Configuration {
     }
 }
 struct VariableData {
-    let id: Int?
-    let isDeleted: Int?
-    let recallToken: String?
-    let repairClubToken: String?
-    let autoAppUrl: String?
-    let scan: String?
-    let nhtsaUrl: String?
-    let repairCost: String?
-    let recallApi: String?
-    let repairInfo: String?
-    let createdAt: String?
-    let updatedAt: String?
+    public let id: Int?
+    public let isDeleted: Int?
+    public let recallToken: String?
+    public let repairClubToken: String?
+    public let autoAppUrl: String?
+    public let scan: String?
+    public let nhtsaUrl: String?
+    public let repairCost: String?
+    public let recallApi: String?
+    public let repairInfo: String?
+    public let createdAt: String?
+    public let updatedAt: String?
 
     init(json: JSON) {
         self.id = json["data"]["id"].intValue

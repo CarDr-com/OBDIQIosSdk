@@ -288,7 +288,7 @@ public class CarDrConnectionApi {
     
     
     public  func scanForDevice() {
-        
+        rc.setSampleVehicleOnSim(.chevroletCamaro2010)
             rc.returnDevices { result in
                 switch result {
                 case .success(let devices):
@@ -967,7 +967,7 @@ public class CarDrConnectionApi {
                         self.scanID = id
                         print("callScanApi: Response Scan ID: \(id)")
 
-                        
+                        self.connectionListner?.didReadyForRepairInfo(isReady: true)
                     }
 
                 } catch {
