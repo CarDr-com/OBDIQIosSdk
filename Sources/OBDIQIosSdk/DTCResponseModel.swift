@@ -9,7 +9,7 @@ import Foundation
 import SwiftyJSON
 
 
-public struct DTCResponse {
+public struct DTCResponse: Sendable {
     public var dtcErrorCode: String = ""
     public var desc: String = ""
     public var status: String = ""
@@ -17,29 +17,29 @@ public struct DTCResponse {
     public var section: String = ""
 }
 
-public class DTCResponseModel {
+
+public class DTCResponseModel: @unchecked Sendable {
     public var id: String? = nil
     public var moduleName: String = ""
     public var responseStatus: String? = nil
     public var identifier: String = ""
     public var dtcCodeArray: [DTCResponse] = []
 
-    // Function to remove duplicate DTCResponses based on dtcErrorCode
     func removeDuplicateDTCResponses() {
-        var uniqueDTCErrorCodes = Set<String>()
-        var uniqueDTCResponses: [DTCResponse] = []
+        var unique = Set<String>()
+        var filtered: [DTCResponse] = []
 
-        for dtcResponse in dtcCodeArray {
-            if uniqueDTCErrorCodes.insert(dtcResponse.dtcErrorCode).inserted {
-                uniqueDTCResponses.append(dtcResponse)
+        for item in dtcCodeArray {
+            if unique.insert(item.dtcErrorCode).inserted {
+                filtered.append(item)
             }
         }
-
-        dtcCodeArray = uniqueDTCResponses
+        dtcCodeArray = filtered
     }
 }
 
-public class RecallResponse {
+
+public class RecallResponse: @unchecked Sendable {
     public var vin: String?
     public var year: String?
     public var makeName: String?
@@ -77,7 +77,7 @@ public class RecallResponse {
     }
 }
 
-public class RecallResult {
+public class RecallResult: @unchecked Sendable {
     // 🔹 Common / Old API fields
     public var manufacturer: String?
     public var campaignNumber: String?
@@ -192,7 +192,7 @@ public class RecallResult {
     }
 }
 
-class Configuration {
+public class Configuration: @unchecked Sendable {
     public var autoAppUrl :String?
     public var nhtsaUrl:String?
     public var recallToken :String?
@@ -214,7 +214,7 @@ class Configuration {
         self.repairClubToken = json["repairClubToken"].stringValue
     }
 }
-struct VariableData {
+public struct VariableData: Sendable {
     public let id: Int?
     public let isDeleted: Int?
     public let recallToken: String?

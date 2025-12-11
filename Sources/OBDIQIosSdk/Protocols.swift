@@ -7,8 +7,8 @@
 
 import Foundation
 import RepairClubSDK
-public protocol ConnectionListener {
-     func didDevicesFetch(foundedDevices: [DeviceItem]?)
+public protocol ConnectionListener: Sendable {
+    func didDevicesFetch(foundedDevices: [DeviceItem]?)
     func didCheckScanStatus(status: String)
     func didFetchVehicleInfo(vehicleEntry: VehicleEntries)
     func didFetchMil(mil: Bool)
@@ -20,3 +20,4 @@ public protocol ConnectionListener {
     func didReadyForRepairInfo(isReady: Bool)
     func didReceiveRepairCost(result: [String: Any]?)
 }
+

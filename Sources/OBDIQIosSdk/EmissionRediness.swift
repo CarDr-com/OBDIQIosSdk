@@ -7,7 +7,7 @@
 
 import Foundation
 
-public class EmissionRediness{
+public class EmissionRediness : @unchecked Sendable {
     var name:String = ""
     var available = false
     var complete = false

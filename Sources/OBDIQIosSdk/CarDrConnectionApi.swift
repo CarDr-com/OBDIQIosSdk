@@ -312,7 +312,7 @@ public class CarDrConnectionApi: @unchecked Sendable {
             case .supportedMIDsReceived:
                 print("Connection: supportedMIDsReceived - \(connectionState)")
             case .odometerReceived:
-                print("Connection: ODOMETER - \(connectionEntry.odometer)")
+                print("Connection: ODOMETER - \(String(describing: connectionEntry.odometer))")
             @unknown default: break
             }
         }
@@ -466,15 +466,13 @@ public class CarDrConnectionApi: @unchecked Sendable {
                 // Already connected → clear codes directly
                 Task {
                     try await Task.sleep(nanoseconds: 1_000_000_000)
-                    do {
+                   
                         self.rc.clearAllCodes { progress in
                             Task { @MainActor in
                                 completion(progress)
                             }
                         }
-                    } catch {
-                        print("Error clearing codes: \(error)")
-                    }
+                    
                 }
             }
         }
@@ -491,7 +489,9 @@ public class CarDrConnectionApi: @unchecked Sendable {
             let module = model.moduleName
             for dtc in model.dtcCodeArray {
                 let status = dtc.status.lowercased()
-                if status.contains("active") || status.contains("confirmed") || status.contains("permanent") {
+                if status.contains("active")
+                    || status.contains("confirmed")
+                    || status.contains("permanent") {
 
                     let cleaned = dtc.desc
                         .replacingOccurrences(of: "[^a-zA-Z0-9 .,]", with: "", options: .regularExpression)
@@ -516,29 +516,28 @@ public class CarDrConnectionApi: @unchecked Sendable {
             .map { Array(dtcArr[$0..<min($0 + chunkSize, dtcArr.count)]) }
 
         let dispatchGroup = DispatchGroup()
-
-        // 👉 SERIAL QUEUE = Thread-safe mutations, Swift 6 compatible
         let syncQueue = DispatchQueue(label: "repair.cost.sync.queue")
 
-        var jsonResponses: [[String: Any]] = []
-        var successful = 0
-        var failed = 0
+        // 🆕 Replacement for mutated captured vars
+        let state = DtcProcessingState()
 
         guard let repairInfo = variableData?.repairInfo else { return }
 
         for chunk in dtcArrChunks {
             dispatchGroup.enter()
 
-            let params: [String: Any] = ["dtcCode": chunk, "vin": vinNumber]
+            let params: [String: Any] = [
+                "dtcCode": chunk,
+                "vin": vinNumber
+            ]
 
-            callApiJSON(url: Constants.BASE_URL + repairInfo, params: params) { status, response in
-
-                syncQueue.async {     // ← NOT @Sendable, thread-safe, allowed
-                    if status, let data = response {
-                        jsonResponses.append(data)
-                        successful += 1
+            callApiJSON(url: Constants.BASE_URL + repairInfo, params: params) { responseDict in
+                syncQueue.async {
+                    if let dict = responseDict {
+                        state.jsonResponses.append(dict.value)
+                        state.successful += 1
                     } else {
-                        failed += 1
+                        state.failed += 1
                     }
                     dispatchGroup.leave()
                 }
@@ -548,51 +547,65 @@ public class CarDrConnectionApi: @unchecked Sendable {
         dispatchGroup.notify(queue: .main) { [weak self] in
             guard let self else { return }
 
-            let merged = jsonResponses.reduce(into: [String: Any]()) { result, dict in
-                result.merge(dict) { _, new in new }
-            }
+            syncQueue.async {
+                let responsesCopy = state.jsonResponses
+                let failedCopy = state.failed
 
-            if failed == dtcArrChunks.count {
-                self.connectionListner?.didReceiveRepairCost(result: nil)
-                return
-            }
+                DispatchQueue.main.async {
+                    let mergedDict = responsesCopy.reduce(into: [String: Any]()) { result, dict in
+                        result.merge(dict) { _, new in new }
+                    }
 
-            self.postRepairCost(dtcErrorCodeArray: dtcErrorCodeArray, jsonObject: merged)
-            self.connectionListner?.didReceiveRepairCost(result: merged)
+                    if failedCopy == dtcArrChunks.count {
+                        self.connectionListner?.didReceiveRepairCost(result: nil)
+                        return
+                    }
+
+                    self.postRepairCost(dtcErrorCodeArray: dtcErrorCodeArray, jsonObject: mergedDict)
+                    self.connectionListner?.didReceiveRepairCost(result: mergedDict)
+                }
+            }
         }
     }
 
 
+
     // MARK: - callApiJSON (keeps @Sendable callback; safe due to actor usage)
-    private func callApiJSON(url: String, params: [String: Any], callback: @escaping (Bool, [String: Any]?) -> Void) {
-        guard let jsonData = try? JSONSerialization.data(withJSONObject: params, options: []) else {
-            callback(false, nil)
+    private func callApiJSON(
+        url: String,
+        params: [String: Any],
+        callback: @escaping @Sendable (SendableDict?) -> Void
+    ) {
+        guard let jsonData = try? JSONSerialization.data(withJSONObject: params) else {
+            callback(nil)
             return
         }
 
         guard let request = makeJSONRequest(urlString: url, method: "POST", body: jsonData) else {
-            callback(false, nil)
+            callback(nil)
             return
         }
 
         URLSession.shared.dataTask(with: request) { data, _, error in
-            if let error = error {
-                print("API Error: \(error.localizedDescription)")
-                callback(false, nil)
+            if error != nil {
+                callback(nil)
                 return
             }
+
             guard let data = data else {
-                callback(false, nil)
+                callback(nil)
                 return
             }
 
             if let jsonResponse = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-                callback(true, jsonResponse)
+                callback(SendableDict(value: jsonResponse))
             } else {
-                callback(false, nil)
+                callback(nil)
             }
         }.resume()
     }
+
+
 
     // MARK: - callScanApi
     private func callScanApi() {
@@ -779,7 +792,7 @@ public class CarDrConnectionApi: @unchecked Sendable {
             print("❌ Missing API URL components")
             return
         }
-        callApiJSON(url: Constants.BASE_URL + repaircost, params: response) { status, response in
+        callApiJSON(url: Constants.BASE_URL + repaircost, params: response) { response in
             print("Repair Cost API Response: \(String(describing: response))")
         }
     }
@@ -1104,6 +1117,7 @@ extension Array {
         }
     }
 }
+extension JSON: @unchecked @retroactive Sendable {}
 
 struct StreamSample {
     let ecuKey: String
@@ -1113,4 +1127,12 @@ struct StreamSample {
     let unit: String
     let timestamp: Date
     let displayValue: String
+}
+final class DtcProcessingState: @unchecked Sendable {
+    var jsonResponses: [[String: Any]] = []
+    var successful: Int = 0
+    var failed: Int = 0
+}
+struct SendableDict: @unchecked Sendable {
+    let value: [String: Any]
 }
