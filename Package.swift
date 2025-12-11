@@ -16,10 +16,7 @@ let package = Package(
         ),
     ],
     dependencies: [
-        .package(
-            url: "https://github.com/repairclub/repairclub-ios-sdk.git",
-            from: "1.5.4"
-        ),
+        .package(url: "https://github.com/RRCummins/RepairClubSDK.git", from: "1.5.4"),
         .package(
             url: "https://github.com/SwiftyJSON/SwiftyJSON.git",
             from: "5.0.2"
@@ -29,7 +26,7 @@ let package = Package(
         .target(
             name: "OBDIQIosSdk",
             dependencies: [
-                .product(name: "RepairClubSDK", package: "repairclub-ios-sdk"),
+                .product(name: "RepairClubSDK", package: "RepairClubSDK"),
                 .product(name: "SwiftyJSON", package: "SwiftyJSON")
             ]
         )

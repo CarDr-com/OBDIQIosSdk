@@ -18,4 +18,5 @@ public protocol ConnectionListener {
     func didReceivedRepairCost(jsonString: String)
     func didScanForDevice(startScan: Bool)
     func didReadyForRepairInfo(isReady: Bool)
+    func didReceiveRepairCost(result: [String: Any]?)
 }
