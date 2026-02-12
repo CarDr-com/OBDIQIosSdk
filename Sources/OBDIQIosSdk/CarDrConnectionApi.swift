@@ -468,11 +468,17 @@ public class CarDrConnectionApi: @unchecked Sendable {
                                             Task { [weak self] in
                                                 guard let self = self else { return }
                                                 try await Task.sleep(nanoseconds: 1_000_000_000)
-                                                self.rc.clearAllCodes { progress in
-                                                    Task { @MainActor in
-                                                        completion(progress)
+                                                do {
+                                                    try self.rc.clearAllCodes { progress in
+                                                        Task { @MainActor in
+                                                            completion(progress)
+                                                        }
                                                     }
+                                                } catch {
+                                                    print("Error clearing codes: \(error)")
+                                                       // if applicable
                                                 }
+                                                
                                             }
                                         default: break
                                     }
@@ -489,11 +495,16 @@ public class CarDrConnectionApi: @unchecked Sendable {
                 Task {
                     try await Task.sleep(nanoseconds: 1_000_000_000)
                    
-                        self.rc.clearAllCodes { progress in
+                    do {
+                        try self.rc.clearAllCodes { progress in
                             Task { @MainActor in
                                 completion(progress)
                             }
                         }
+                    } catch {
+                        print("Error clearing codes: \(error)")
+                           // if applicable
+                    }
                     
                 }
             }
@@ -876,7 +887,7 @@ public class CarDrConnectionApi: @unchecked Sendable {
         isReadinessComplete = false
         emissionList.removeAll()
 
-        rc.subscribeToMonitors { [weak self] str in
+        rc.subscribeToReadinessUpdates { [weak self] str in
             guard let self = self else { return }
             do {
                 self.emissionList.removeAll()
@@ -902,7 +913,14 @@ public class CarDrConnectionApi: @unchecked Sendable {
                 // ignore error
             }
         }
-        rc.requestReadinessMonitors(reqType: 3)
+        
+        Task {
+            do {
+                try await rc.requestReadiness(mode: .standard)
+            } catch {
+                // Handle error
+            }
+        }
     }
 
     public func checkPassFailEmission() -> String {
