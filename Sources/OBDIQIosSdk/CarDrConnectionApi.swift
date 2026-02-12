@@ -887,7 +887,7 @@ public class CarDrConnectionApi: @unchecked Sendable {
         isReadinessComplete = false
         emissionList.removeAll()
 
-        rc.subscribeToReadinessUpdates { [weak self] str in
+        rc.subscribeToReadinessUpdates({ [weak self] str in
             guard let self = self else { return }
             do {
                 self.emissionList.removeAll()
@@ -912,7 +912,7 @@ public class CarDrConnectionApi: @unchecked Sendable {
             } catch {
                 // ignore error
             }
-        }
+        })
         
         Task {
             do {
