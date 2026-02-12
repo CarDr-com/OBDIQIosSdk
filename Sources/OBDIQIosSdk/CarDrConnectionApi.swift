@@ -56,23 +56,45 @@ public class CarDrConnectionApi: @unchecked Sendable {
 
     var vinNumber = ""
     var hardwareIdentifier = ""
+    var isProductionReady = false
 
+
+    
     // MARK: - Initial Function to Initialize the SDK
-    public func initialConnect(listener: ConnectionListener) {
+    public func initialize(partnerID: String,
+                           isProductionReady: Bool = false,
+                           listener: ConnectionListener) {
+
         self.connectionListner = listener
+        self.isProductionReady = isProductionReady
+
         let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
 
-        getVariable { [weak self] it in
+        getVariable(partnerID: partnerID) { [weak self] it in
             guard let self = self else { return }
+
+     
+            guard let it = it else {
+                return
+            }
+
+      
+            self.variableData = it
+
+        
             self.rc.configureSDK(
-                tokenString: it?.repairClubToken ?? "",
-                appName: "OBDIQ ULTRA SDK",
+                tokenString: it.repairClubToken ?? "",
+                appName: "OBDIQ ULTRA SDK iOS",
                 appVersion: appVersion,
                 userID: "support@cardr.com"
             )
+
+        
+            self.dissconnectOBD()
             self.connectionListner?.didScanForDevice(startScan: true)
         }
     }
+
 
     // MARK: - Helpers for building requests
     private func makeJSONRequest(urlString: String, method: String = "GET", body: Data? = nil) -> URLRequest? {
@@ -80,14 +102,16 @@ public class CarDrConnectionApi: @unchecked Sendable {
         var req = URLRequest(url: url)
         req.httpMethod = method
         req.addValue("application/json", forHTTPHeaderField: "Content-Type")
-        req.addValue("edf9bc2d74ad74ac924c9bcbc337ef62", forHTTPHeaderField: "access-token")
-        req.addValue("a4d01210f164259f3ed2f1072f0819d5", forHTTPHeaderField: "server-key")
+        req.addValue(self.variableData?.accessToken ?? "", forHTTPHeaderField: "access-token")
+        req.addValue(self.variableData?.serverKey ?? "", forHTTPHeaderField: "server-key")
         req.httpBody = body
         return req
     }
 
     // MARK: - getVariable
-    private func getVariable(completion: @Sendable @escaping (VariableData?) -> Void) {
+    private func getVariable(partnerID: String,
+                             completion: @Sendable @escaping (VariableData?) -> Void) {
+
         guard let url = URL(string: Constants.GET_VARIABLE_URL) else {
             print("Invalid URL")
             completion(nil)
@@ -97,51 +121,44 @@ public class CarDrConnectionApi: @unchecked Sendable {
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         request.addValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.addValue("edf9bc2d74ad74ac924c9bcbc337ef62", forHTTPHeaderField: "access-token")
-        request.addValue("a4d01210f164259f3ed2f1072f0819d5", forHTTPHeaderField: "server-key")
+        request.addValue(partnerID, forHTTPHeaderField: "partner-id") // ✅ Android same header
 
-        let task = URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
+        let task = URLSession.shared.dataTask(with: request) { [weak self] data, _, error in
             guard let self = self else { return }
 
             if let error = error {
                 print("API Error: \(error.localizedDescription)")
-                DispatchQueue.main.async {
-                    completion(nil)
-                }
+                DispatchQueue.main.async { completion(nil) }
                 return
             }
 
             guard let data = data else {
                 print("No data received")
-                DispatchQueue.main.async {
-                    completion(nil)
-                }
+                DispatchQueue.main.async { completion(nil) }
                 return
             }
 
             do {
-                if let jsonObj = try JSONSerialization.jsonObject(with: data) as? [String: Any] {
-                    let jsonValue = JSON(jsonObj)
-                    let responseObj = VariableData(json: jsonValue)
-                    DispatchQueue.main.async {
-                        self.variableData = responseObj
-                        completion(responseObj)
-                    }
-                } else {
-                    DispatchQueue.main.async {
-                        completion(nil)
-                    }
+                let jsonObj = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+                let json = JSON(jsonObj ?? [:])
+
+                // ✅ Now model handles parsing internally
+                let variableData = VariableData(json: json)
+
+                DispatchQueue.main.async {
+                    self.variableData = variableData
+                    completion(variableData)
                 }
+
             } catch {
                 print("JSON decode error: \(error.localizedDescription)")
-                DispatchQueue.main.async {
-                    completion(nil)
-                }
+                DispatchQueue.main.async { completion(nil) }
             }
         }
 
         task.resume()
     }
+
 
     // MARK: - getConfigValues
     private func getConfigValues(completion: @Sendable @escaping (Configuration) -> Void) {
@@ -149,8 +166,8 @@ public class CarDrConnectionApi: @unchecked Sendable {
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         request.addValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.addValue("edf9bc2d74ad74ac924c9bcbc337ef62", forHTTPHeaderField: "access-token")
-        request.addValue("a4d01210f164259f3ed2f1072f0819d5", forHTTPHeaderField: "server-key")
+        request.addValue(self.variableData?.accessToken ?? "", forHTTPHeaderField: "access-token")
+        request.addValue(self.variableData?.serverKey ?? "", forHTTPHeaderField: "server-key")
 
         let task = URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
             guard let self = self else { return }
@@ -687,8 +704,8 @@ public class CarDrConnectionApi: @unchecked Sendable {
         request.httpMethod = "POST"
         request.httpBody = body
         request.addValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.addValue("edf9bc2d74ad74ac924c9bcbc337ef62", forHTTPHeaderField: "access-token")
-        request.addValue("a4d01210f164259f3ed2f1072f0819d5", forHTTPHeaderField: "server-key")
+        request.addValue(self.variableData?.accessToken ?? "", forHTTPHeaderField: "access-token")
+        request.addValue(self.variableData?.serverKey ?? "", forHTTPHeaderField: "server-key")
 
         // ------- Perform request (no Sendable issues) -------
         URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
@@ -1070,8 +1087,8 @@ public class CarDrConnectionApi: @unchecked Sendable {
         request.httpMethod = "POST"
         request.httpBody = httpBody
         request.addValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.addValue("edf9bc2d74ad74ac924c9bcbc337ef62", forHTTPHeaderField: "access-token")
-        request.addValue("a4d01210f164259f3ed2f1072f0819d5", forHTTPHeaderField: "server-key")
+        request.addValue(self.variableData?.accessToken ?? "", forHTTPHeaderField: "access-token")
+        request.addValue(self.variableData?.serverKey ?? "", forHTTPHeaderField: "server-key")
 
         URLSession.shared.dataTask(with: request) { data, response, error in
             if let error = error {

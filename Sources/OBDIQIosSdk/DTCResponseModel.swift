@@ -215,6 +215,7 @@ public class Configuration: @unchecked Sendable {
     }
 }
 public struct VariableData: Sendable {
+
     public let id: Int?
     public let isDeleted: Int?
     public let recallToken: String?
@@ -227,20 +228,37 @@ public struct VariableData: Sendable {
     public let repairInfo: String?
     public let createdAt: String?
     public let updatedAt: String?
+    public let scanUpdate: String?
+    public let serverKey: String?
+    public let accessToken: String?
 
     init(json: JSON) {
-        self.id = json["data"]["id"].intValue
-        self.isDeleted = json["data"]["is_deleted"].intValue
-        self.recallToken = json["data"]["recallToken"].stringValue
-        self.repairClubToken = json["data"]["repairClubToken"].stringValue
-        self.autoAppUrl = json["data"]["autoAppUrl"].stringValue
-        self.scan = json["data"]["scan"].stringValue
-        self.nhtsaUrl = json["data"]["nhtsaUrl"].stringValue
-        self.repairCost = json["data"]["repairCost"].stringValue
-        self.recallApi = json["data"]["recallApi"].stringValue
-        self.repairInfo = json["data"]["repairInfo"].stringValue
-        self.createdAt = json["data"]["createdAt"].stringValue
-        self.updatedAt = json["data"]["updatedAt"].stringValue
+
+        // ✅ Android structure
+        let variable = json["data"]["variable"]
+        let partnerDetail = json["data"]["partnerDetail"]
+
+        self.id = variable["id"].int
+        self.isDeleted = variable["is_deleted"].int
+        self.recallToken = variable["recallToken"].string
+        self.repairClubToken = variable["repairClubToken"].string
+        self.autoAppUrl = variable["autoAppUrl"].string
+        self.scan = variable["scan"].string
+        self.nhtsaUrl = variable["nhtsaUrl"].string
+        self.repairCost = variable["repairCost"].string
+        self.recallApi = variable["recallApi"].string
+        self.repairInfo = variable["repairInfo"].string
+        self.createdAt = variable["createdAt"].string
+        self.updatedAt = variable["updatedAt"].string
+        self.scanUpdate = variable["scanUpdate"].string
+
+        // ✅ partnerDetail mapping
+        self.serverKey = partnerDetail["server_key"].string
+        self.accessToken = partnerDetail["access_token"].string
     }
 }
+
+
+
+
 
