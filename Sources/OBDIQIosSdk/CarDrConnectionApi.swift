@@ -287,7 +287,7 @@ public class CarDrConnectionApi: @unchecked Sendable {
                     entry.description = vehicleEntry.description
                     entry.engine = vehicleEntry.engine
                     entry.vehiclePowertrainType = vehicleEntry.vehiclePowertrainType?.rawValue ?? "Unknown"
-                    self.getDeviceFirmwareVersion()
+                    
                     self.connectionListner?.didFetchVehicleInfo(vehicleEntry: entry)
                 } else if let vin = connectionEntry.vin {
                     _ = vin
@@ -429,6 +429,7 @@ public class CarDrConnectionApi: @unchecked Sendable {
                     self.dtcErrorCodeArray.append(contentsOf: distinctArray)
 
                     self.connectionListner?.didReceivedCode(model: self.dtcErrorCodeArray)
+                  self.getDeviceFirmwareVersion()
                     self.callScanApi()
 
                 case .scanFailed(errors: let errors):
@@ -685,7 +686,8 @@ public class CarDrConnectionApi: @unchecked Sendable {
                     .filter { $0.responseStatus == ResponseStatus.responded }
                     .compactMap { $0.name }   // safer than map if optional
                     .filter { !$0.localizedCaseInsensitiveContains("generic")
-                           && !$0.localizedCaseInsensitiveContains("standard") }
+                            && !$0.localizedCaseInsensitiveContains("standard") }
+                 
             )
         )
 
