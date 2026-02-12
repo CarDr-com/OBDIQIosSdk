@@ -668,6 +668,15 @@ public class CarDrConnectionApi: @unchecked Sendable {
 
         // Filter modules (responded only, non-generic)
         let controllerArr = filterModules(filterNonGenericModules(controller)).map { $0.name }
+        let uniqueControllerArr = Array(
+            Set(
+                dtcErrorCodeArray
+                    .filter { $0.responseStatus == ResponseStatus.responded.rawValue }
+                    .compactMap { $0.moduleName }   // safer than map if optional
+                    .filter { !$0.localizedCaseInsensitiveContains("generic")
+                           && !$0.localizedCaseInsensitiveContains("standard") }
+            )
+        )
 
         guard let scanPath = variableData?.scan else {
             print("❌ Missing scan API URL path")
@@ -682,7 +691,7 @@ public class CarDrConnectionApi: @unchecked Sendable {
 
         // ------- Build parameters -------
         let parameters: [String: Any] = [
-            "modules": controllerArr,
+            "modules": uniqueControllerArr,
             "vin_number": vinNumber,
             "count_generic": genericCount,
             "odometer": "",
@@ -727,15 +736,25 @@ public class CarDrConnectionApi: @unchecked Sendable {
             }
 
             do {
-                if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] {
-                    let id = (json["data"] as? [String: Any])?["id"] as? String ?? ""
-                    self.scanID = id
-                    print("callScanApi: Scan ID = \(id)")
+                if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                   let dataObj = json["data"] as? [String: Any] {
+
+                    var idString = ""
+
+                    if let id = dataObj["id"] as? Int {
+                        idString = "\(id)"
+                    } else if let id = dataObj["id"] as? String {
+                        idString = id
+                    }
+
+                    self.scanID = idString
+                    print("callScanApi: Scan ID = \(idString)")
 
                     DispatchQueue.main.async {
                         self.connectionListner?.didReadyForRepairInfo(isReady: true)
                     }
                 }
+
             } catch {
                 print("callScanApi: JSON parse error: \(error.localizedDescription)")
             }
