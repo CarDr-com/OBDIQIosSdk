@@ -287,7 +287,7 @@ public class CarDrConnectionApi: @unchecked Sendable {
                     entry.description = vehicleEntry.description
                     entry.engine = vehicleEntry.engine
                     entry.vehiclePowertrainType = vehicleEntry.vehiclePowertrainType?.rawValue ?? "Unknown"
-
+                    self.getDeviceFirmwareVersion()
                     self.connectionListner?.didFetchVehicleInfo(vehicleEntry: entry)
                 } else if let vin = connectionEntry.vin {
                     _ = vin
@@ -438,6 +438,11 @@ public class CarDrConnectionApi: @unchecked Sendable {
                 }
         }
     }
+    
+    @MainActor
+    public  func stopTroubleCodeScan() {
+        self.rc.stopTroubleCodeScan()
+     }
 
     // MARK: - clearCode (uses concurrency)
     @MainActor
@@ -1103,6 +1108,18 @@ public class CarDrConnectionApi: @unchecked Sendable {
             completion(true, responseText)
         }.resume()
     }
+    
+    
+    public func getDeviceFirmwareVersion() -> Result<String?, Error>? {
+
+        let result = self.rc.getDeviceFirmwareVersion()
+
+ 
+        currentFirmwareVersion = (try? result.get()) ?? ""
+
+        return result
+    }
+
 }
 
 // MARK: - Extensions
