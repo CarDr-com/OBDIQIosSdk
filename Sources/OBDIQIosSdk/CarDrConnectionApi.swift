@@ -670,9 +670,9 @@ public class CarDrConnectionApi: @unchecked Sendable {
         let controllerArr = filterModules(filterNonGenericModules(controller)).map { $0.name }
         let uniqueControllerArr = Array(
             Set(
-                dtcErrorCodeArray
-                    .filter { $0.responseStatus == ResponseStatus.responded.rawValue }
-                    .compactMap { $0.moduleName }   // safer than map if optional
+                controller
+                    .filter { $0.responseStatus == ResponseStatus.responded }
+                    .compactMap { $0.name }   // safer than map if optional
                     .filter { !$0.localizedCaseInsensitiveContains("generic")
                            && !$0.localizedCaseInsensitiveContains("standard") }
             )
